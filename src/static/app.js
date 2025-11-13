@@ -3,18 +3,35 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const signoutBtn = document.getElementById("signout-btn");
+  const participantsList = document.getElementById("participants-list");
+  let allActivities = {};
+
+  // Handle sign out
+  signoutBtn.addEventListener("click", () => {
+    // Clear user session data
+    sessionStorage.clear();
+    localStorage.clear();
+    
+    // Reset form
+    signupForm.reset();
+    messageDiv.classList.add("hidden");
+    
+    // Show confirmation
+    alert("You have been signed out.");
+  });
 
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
       const response = await fetch("/activities");
-      const activities = await response.json();
+      allActivities = await response.json();
 
       // Clear loading message
       activitiesList.innerHTML = "";
 
       // Populate activities list
-      Object.entries(activities).forEach(([name, details]) => {
+      Object.entries(allActivities).forEach(([name, details]) => {
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
 
@@ -41,6 +58,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Handle activity selection change
+  activitySelect.addEventListener("change", () => {
+    const selectedActivity = activitySelect.value;
+    
+    if (!selectedActivity) {
+      participantsList.innerHTML = '<p class="placeholder-text">Select an activity to view participants</p>';
+      return;
+    }
+
+    const activity = allActivities[selectedActivity];
+    if (!activity) {
+      participantsList.innerHTML = '<p>Activity not found</p>';
+      return;
+    }
+
+    // Display participants
+    if (activity.participants.length === 0) {
+      participantsList.innerHTML = '<p class="placeholder-text">No participants yet</p>';
+    } else {
+      participantsList.innerHTML = '';
+      const participantHeader = document.createElement("p");
+      participantHeader.innerHTML = `<strong>${activity.participants.length} participant${activity.participants.length !== 1 ? 's' : ''}</strong>`;
+      participantsList.appendChild(participantHeader);
+
+      const participantList = document.createElement("ul");
+      participantList.className = "participant-list";
+      activity.participants.forEach((email) => {
+        const listItem = document.createElement("li");
+        listItem.textContent = email;
+        participantList.appendChild(listItem);
+      });
+      participantsList.appendChild(participantList);
+    }
+  });
+
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -62,6 +114,13 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        
+        // Refresh participants list
+        await fetchActivities();
+        if (activity) {
+          activitySelect.value = activity;
+          activitySelect.dispatchEvent(new Event("change"));
+        }
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
